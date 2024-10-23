@@ -1,10 +1,35 @@
 <?php
-// Connexion à la base de données
-require_once '../../config/database.php';
+require_once './config/database.php';
 
-// Requête pour récupérer tous les partis politiques
-$query = "SELECT nom, urlImage FROM parties";
-$result = $db->query($query);
+// Récupération des partis politiques
+$query = "SELECT id, nom, urlimage FROM parties";
+$result = $pdo->query($query);
+$partis = $result->fetchAll(PDO::FETCH_ASSOC);
+
+// Gestion de la soumission du formulaire
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $codeEtudiant = $_POST['codeEtudiant'];
+    $partiId = $_POST['parti'];
+
+    // Vérification si l'étudiant a déjà voté
+    $checkVoteQuery = "SELECT * FROM votes WHERE code_etudiant = :codeEtudiant";
+    $stmt = $pdo->prepare($checkVoteQuery);
+    $stmt->execute([':codeEtudiant' => $codeEtudiant]);
+    
+    if ($stmt->rowCount() > 0) {
+        echo "<div class='alert alert-danger'>Vous avez déjà voté !</div>";
+    } else {
+        // Insertion du vote
+        $insertVoteQuery = "INSERT INTO votes (code_etudiant, partie_id, voted_At) VALUES (:codeEtudiant, :partieId, NOW())";
+        $stmt = $pdo->prepare($insertVoteQuery);
+        
+        if ($stmt->execute([':codeEtudiant' => $codeEtudiant, ':partieId' => $partiId])) {
+            echo "<div class='alert alert-success'>Votre vote a été enregistré avec succès !</div>";
+        } else {
+            echo "<div class='alert alert-danger'>Une erreur s'est produite lors de l'enregistrement de votre vote.</div>";
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -13,52 +38,56 @@ $result = $db->query($query);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vote - Université</title>
-    <link rel="stylesheet" href="/assets/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./assets/css/styles.css">
 </head>
 <body>
-    <!-- Toolbar -->
-    <div class="toolbar">
-        <div class="logo-container">
-            <img src="/assets/images/logo2IE.png" alt="Logo de l'Université" class="logo">
+    <nav class="navbar navbar-light bg-light p-3">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <img src="./assets/images/logo2IE.png" alt="Logo de l'Université" class="logo" style="height: 80px;">
+                Élection du Nouveau Bureau Exécutif
+            </a>
+            <a href="./views/admin/login.php" class="btn btn-outline-secondary">Admin - Se connecter</a>
         </div>
-        <h2>Élection du Nouveau Bureau Exécutif</h2>
-    </div>
+    </nav>
 
-    <div class="container">
-        <header>
+    <div class="container mt-5">
+        <header class="text-center mb-4">
             <h1>Votez pour votre Parti Politique</h1>
-            <p>Veuillez entrer votre code étudiant et sélectionner un parti pour voter.</p>
+            <p class="lead">Veuillez entrer votre code étudiant et sélectionner un parti pour voter.</p>
         </header>
 
-        <form action="../../controllers/StudentController.php" method="POST" class="vote-form">
-            <!-- Champ pour le code étudiant -->
-            <div class="form-group">
-                <label for="student_code">Code Étudiant :</label>
-                <input type="text" id="student_code" name="codeEtudiant" required placeholder="Entrez votre code étudiant">
+        <form action="" method="POST" class="vote-form">
+            <div class="mb-4">
+                <label for="student_code" class="form-label">Code Étudiant :</label>
+                <input type="text" id="student_code" name="codeEtudiant" class="form-control" required placeholder="Entrez votre code étudiant">
             </div>
 
-            <!-- Section des partis politiques -->
-            <div class="form-group parties-section">
-                <label>Choisissez un Parti Politique :</label>
-                <div class="parties-list">
-                    <?php while ($row = $result->fetch_assoc()): ?>
-                        <div class="party">
-                            <input type="radio" id="party_<?php echo $row['id']; ?>" name="party_id" value="<?php echo $row['id']; ?>" required>
-                            <label for="party_<?php echo $row['id']; ?>">
-                                <img src="/assets/images/<?php echo $row['image_url']; ?>" alt="<?php echo $row['name']; ?>" class="party-img">
-                                <p><?php echo $row['name']; ?></p>
-                            </label>
+            <div class="mb-4">
+                <label class="form-label">Choisissez un Parti Politique :</label>
+                <div class="row">
+                    <?php foreach ($partis as $parti): ?>
+                        <div class="col-md-4 mb-4 text-center">
+                            <div class="card">
+                                <img src="./views/admin/<?= htmlspecialchars($parti['urlimage']) ?>" class="card-img-top" alt="<?= htmlspecialchars($parti['nom']) ?>" style="height: 200px; object-fit: cover;">
+                                <div class="card-body">
+                                    <h5 class="card-title"><?= htmlspecialchars($parti['nom']) ?></h5>
+                                    <input type="radio" id="parti_<?= $parti['id'] ?>" name="parti" value="<?= $parti['id'] ?>" required>
+                                    <label for="parti_<?= $parti['id'] ?>" class="form-label">Sélectionner</label>
+                                </div>
+                            </div>
                         </div>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
-            <button type="submit" class="btn">Soumettre votre vote</button>
+            <div class="d-grid mb-4">
+                <button type="submit" class="btn btn-primary btn-lg">Soumettre votre vote</button>
+            </div>
         </form>
-
-        <footer>
-            <a href="../admin/login.php" class="admin-link">Admin - Se connecter</a>
-        </footer>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
